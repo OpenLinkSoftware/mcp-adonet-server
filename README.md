@@ -3,8 +3,7 @@
 
 A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is compatible with Virtuoso DBMS and other DBMS backends that has ODBC driver.
 
-![mcp-client-and-servers|648x499](https://www.openlinksw.com/data/gifs/mcp-client-and-servers-opal-tools-with-jdbc.gif)
-
+![mcp-client-and-servers|648x499](https://www.openlinksw.com/DAV/www2.openlinksw.com/data/gifs//mcp-client-and-servers-opal-tools-with-dotnet.gif)
 ---
 
 ## Features
