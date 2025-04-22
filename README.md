@@ -199,7 +199,7 @@ For easy troubleshooting:
 
 2. Start the inspector:
    ```bash
-   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
    ```
 
 Access the provided URL to troubleshoot server interactions.
