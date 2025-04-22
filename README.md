@@ -23,11 +23,26 @@ A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is c
 ---
 
 ## Prerequisites
-1. **NET.8 or above**:
+1. **NET.8 or above**
+- Check that the project file (`MCP_AdoNet_Server.csproj`) is compatible with your environment by running:
+  ```sh
+  dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+  ```
+- If need be, you can also attempt to rebuild `MCP_AdoNet_Server.csproj` by running:
+  ```sh
+  dotnet clean /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+  dotnet build /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+  ```
 
-2. **unixODBC Runtime Environment Checks**:
-- Check installation configuration (i.e., location of key INI files) by running: `odbcinst -j`
-- List available data source names by running: `odbcinst -q -s`
+3. **unixODBC Runtime Environment Checks**:
+- Check installation configuration (i.e., location of key INI files) by running:
+  ```sh
+  odbcinst -j
+  ```
+- List available data source names by running:
+  ```sh
+  odbcinst -q -s
+  ```
    
 3. **ODBC DSN Setup**: Configure your ODBC Data Source Name (`~/.odbc.ini`) for the target database. Example for Virtuoso DBMS:
    ```
