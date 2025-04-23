@@ -430,8 +430,8 @@ public sealed class VirtuosoTools
             await using var cmd = conn.CreateCommand();
 
             cmd.CommandText = $"select Demo.demo.execute_spasql_query('{EscapeSql(query)}', ?, ?) as result";
-            cmd.Parameters.Add(maxRows);
-            cmd.Parameters.Add(timeoutValue);
+            cmd.Parameters.Add(new OdbcParameter { Value = maxRows });
+            cmd.Parameters.Add(new OdbcParameter { Value = timeoutValue });
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
@@ -474,8 +474,8 @@ public sealed class VirtuosoTools
             await using var cmd = conn.CreateCommand();
 
             cmd.CommandText = $"select \"UB\".dba.\"sparqlQuery\"('{EscapeSql(query)}', ?, ?) as result";
-            cmd.Parameters.Add(formatValue);
-            cmd.Parameters.Add(timeoutValue);
+            cmd.Parameters.Add(new OdbcParameter { Value = formatValue });
+            cmd.Parameters.Add(new OdbcParameter { Value = timeoutValue });
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
@@ -512,8 +512,8 @@ public sealed class VirtuosoTools
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "select DEMO.DBA.OAI_VIRTUOSO_SUPPORT_AI(?, ?) as result";
-            cmd.Parameters.Add(prompt);
-            cmd.Parameters.Add(key);
+            cmd.Parameters.Add(new OdbcParameter { Value = prompt });
+            cmd.Parameters.Add(new OdbcParameter { Value = key });
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
@@ -550,8 +550,8 @@ public sealed class VirtuosoTools
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "select DEMO.DBA.OAI_SPARQL_FUNC(?, ?) as result";
-            cmd.Parameters.Add(prompt);
-            cmd.Parameters.Add(key);
+            cmd.Parameters.Add(new OdbcParameter { Value = prompt });
+            cmd.Parameters.Add(new OdbcParameter { Value = key });
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
