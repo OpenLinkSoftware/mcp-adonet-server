@@ -205,8 +205,7 @@ For easy troubleshooting:
    ```
    - for macOS
    ```bash
-   export DYLD_LIBRARY_PATH=/opt/homebrew/lib
-   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
+   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e DYLD_LIBRARY_PATH=/opt/homebrew/lib -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
 
    ```
 
