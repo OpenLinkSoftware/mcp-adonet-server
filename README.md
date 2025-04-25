@@ -1,7 +1,7 @@
 ---
 # C# based Model Context Procotol (MCP) Server for ADO.NET
 
-A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is compatible with Virtuoso DBMS and other DBMS backends that has ODBC driver.
+A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is compatible with Virtuoso and other ODBC-accessible DBMS platforms. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux. 
 
 ![mcp-client-and-servers|648x499](https://www.openlinksw.com/DAV/www2.openlinksw.com/data/gifs//mcp-client-and-servers-opal-tools-with-dotnet.gif)
 ---
