@@ -200,11 +200,15 @@ For easy troubleshooting:
 2. Start the inspector:
    - for Windows, Linux
    ```bash
+   dotnet clean /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+   
    npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
 
    ```
    - for macOS
    ```bash
+   dotnet clean /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+   
    npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e DYLD_LIBRARY_PATH=/opt/homebrew/lib -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
 
    ```
