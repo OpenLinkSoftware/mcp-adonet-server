@@ -1,7 +1,7 @@
 ---
 # C# based Model Context Procotol (MCP) Server for ADO.NET
 
-A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is compatible with Virtuoso and other ODBC-accessible DBMS platforms. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux. 
+A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is compatible with Virtuoso. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux. 
 
 ![mcp-client-and-servers|648x499](https://www.openlinksw.com/DAV/www2.openlinksw.com/data/gifs//mcp-client-and-servers-opal-tools-with-dotnet.gif)
 ---
@@ -34,26 +34,6 @@ A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is c
   dotnet build /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
   ```
 
-3. **unixODBC Runtime Environment Checks**:
-- Check installation configuration (i.e., location of key INI files) by running:
-  ```sh
-  odbcinst -j
-  ```
-- List available data source names by running:
-  ```sh
-  odbcinst -q -s
-  ```
-   
-3. **ODBC DSN Setup**: Configure your ODBC Data Source Name (`~/.odbc.ini`) for the target database. Example for Virtuoso DBMS:
-   ```
-   [VOS]
-   Description = OpenLink Virtuoso
-   Driver = /path/to/virtodbcu_r.so
-   Database = Demo
-   Address = localhost:1111
-   WideAsUTF16 = Yes
-   ```
-
 ---
 
 ## Installation
@@ -66,7 +46,7 @@ cd mcp-adonet-server
 ## Environment Variables 
 Update your `.env`by overriding the defaults to match your preferences
 ```
-ADO_URL=DSN=VOS;UID=demo;PWD=demo
+ADO_URL="HOST=localhost:1111;Database=Demo;UID=demo;PWD=demo"
 API_KEY=xxx
 ```
 ---
@@ -82,7 +62,7 @@ Add the following to `claude_desktop_config.json`:
       "command": "dotnet",
       "args": ["run", "--project", "/path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj"],
       "env": {
-        "ADO_URL": "DSN=VOS;UID=demo;PWD=demo",
+        "ADO_URL": "HOST=localhost:1111;Database=Demo;UID=demo;PWD=demo",
         "API_KEY": "sk-xxx"
       }
     }
@@ -198,20 +178,11 @@ For easy troubleshooting:
    ```
 
 2. Start the inspector:
-   - for Windows, Linux
    ```bash
    dotnet clean /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
    
-   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
+   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="HOST=localhost:1111;Database=Demo;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
 
    ```
-   - for macOS
-   ```bash
-   dotnet clean /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
-   
-   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e DYLD_LIBRARY_PATH=/opt/homebrew/lib -e ADO_URL="DSN=MyDSN;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
-
-   ```
-
 
 Access the provided URL to troubleshoot server interactions.

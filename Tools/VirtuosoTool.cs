@@ -1,12 +1,19 @@
 ﻿using System.ComponentModel;
+using System.Collections.Generic;
 using System.Data;
-using System.Data.Odbc;
 using System.Data.Common;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+
 using Newtonsoft.Json;
 using ModelContextProtocol.Server;
 using DotNetEnv;
 using ModelContextProtocol.Protocol.Types;
+using OpenLink.Data.VirtuosoNET;
+using System.IO;
+using Microsoft.Extensions.Logging;
+
 
 
 namespace McpNetServer.Tools;
@@ -14,48 +21,46 @@ namespace McpNetServer.Tools;
 [McpServerToolType]
 public sealed class VirtuosoTools
 {
-    private static readonly string DefaultConnStr;
-    private static readonly int DefaultMaxLongData;
-    private static readonly string DefaultApiKey;
+    private readonly ILogger<VirtuosoTools> _logger;
+    private readonly string DefaultConnStr;
+    private readonly int DefaultMaxLongData;
+    private readonly string DefaultApiKey;
 
-    static VirtuosoTools()
+
+    public VirtuosoTools(ILogger<VirtuosoTools> logger)
     {
+        _logger = logger;
+
         // Load environment variables from a .env file located in the application directory.
         Env.TraversePath().Load();
 
-        DefaultConnStr = Env.GetString("ADO_URL", "DSN=VOS;UID=demo;PWD=demo;");
+        DefaultConnStr = Env.GetString("ADO_URL", "HOST=localhost:1111;Database=Demo;UID=demo;PWD=demo;");
         DefaultMaxLongData = Env.GetInt("MAX_LONG_DATA", 100);
         DefaultApiKey = Env.GetString("API_KEY", "sk-xxx");
     }
 
-    private static string EscapeSql(string value)
-    {
-        if (value == null)
-            return String.Empty;
-        return value.Replace("'", "''");
-    }
-
-    private static DbConnection GetConnection(string? url)
+    private VirtuosoConnection GetConnection(string? url)
     {
         var finalUrl = string.IsNullOrWhiteSpace(url) ? DefaultConnStr : url;
 
         if (string.IsNullOrWhiteSpace(finalUrl))
             throw new InvalidOperationException("ADO_URL is required and was not provided or set in environment.");
 
-        var builder = new OdbcConnectionStringBuilder(finalUrl);
+        var builder = new VirtuosoConnectionStringBuilder(finalUrl);
 
         //if (!string.IsNullOrEmpty(finalUser))
         //    builder.UserID = finalUser;
 
         //if (!string.IsNullOrEmpty(finalPassword))
         //    builder.Password = finalPassword;
+        //_logger.LogInformation("Connect to => "+ builder.ToString());
 
-        return new OdbcConnection(builder.ToString());
+        return new VirtuosoConnection(builder.ToString());
     }
 
     [McpServerTool(Name = "ado_get_schemas"),
      Description("Retrieve and return a list of all schema/catalog names from the connected database.")]
-    public static async Task<CallToolResponse> AdoGetSchemas(
+    public async Task<CallToolResponse> AdoGetSchemas(
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
@@ -64,16 +69,14 @@ public sealed class VirtuosoTools
             await using var conn = GetConnection(url);
             await conn.OpenAsync(cancellationToken);
 
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "select distinct name_part(KEY_TABLE,0) AS TABLE_CAT VARCHAR(128) from DB.DBA.SYS_KEYS order by 1";
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
             var schemas = new List<string>();
-
-            var restrictions = new string?[3];
-            restrictions[0] = "%";
-
-            var metaData = conn.GetSchema("Tables", restrictions);
-
-            foreach (DataRow row in metaData.Rows)
+            while (await reader.ReadAsync(cancellationToken))
             {
-                schemas.Add(row[0].ToString()!);
+                schemas.Add(reader.GetString(0));
             }
 
             var settings = new JsonSerializerSettings
@@ -84,24 +87,24 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = JsonConvert.SerializeObject(schemas, settings) } }
+                Content = [new() { Type = "text", Text = JsonConvert.SerializeObject(schemas, settings) }]
             };
-
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            //_logger.LogInformation("Error ="+ ex);
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new() { Type = "text", Text = ex.Message }]
             };
         }
     }
 
-
+    
     [McpServerTool(Name = "ado_get_tables"),
      Description("Retrieve and return a list containing information about tables in the specified schema.")]
-    public static async Task<CallToolResponse> AdoGetTables(
+    public async Task<CallToolResponse> AdoGetTables(
         [Description("Schema name")] string? schema = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
@@ -115,7 +118,7 @@ public sealed class VirtuosoTools
             restrictions[0] = schema ?? null; // Catalog
             restrictions[2] = "%";
 
-            var tableSchema = conn.GetSchema("Tables", restrictions);
+            var tableSchema = await conn.GetSchemaAsync("Tables", restrictions, cancellationToken);
 
             var tables = new List<Dictionary<string, string?>>();
             foreach (DataRow row in tableSchema.Rows)
@@ -137,7 +140,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = JsonConvert.SerializeObject(tables, settings) } }
+                Content = [new() { Type = "text", Text = JsonConvert.SerializeObject(tables, settings) }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -145,7 +148,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new() { Type = "text", Text = ex.Message }]
             };
         }
     }
@@ -153,7 +156,7 @@ public sealed class VirtuosoTools
 
     [McpServerTool(Name = "ado_describe_table"),
      Description("Retrieve and return full metadata about a table including columns, primary keys, and foreign keys.")]
-    public static async Task<CallToolResponse> AdoDescribeTable(
+    public async Task<CallToolResponse> AdoDescribeTable(
         [Description("Schema name")] string? schema = null,
         [Description("Table name")] string table = "",
         [Description("ADO URL")] string? url = null,
@@ -164,7 +167,7 @@ public sealed class VirtuosoTools
             await using var conn = GetConnection(url);
             await conn.OpenAsync(cancellationToken);
 
-            var tableInfo = GetTableInfoAsync(conn, schema, table);
+            var tableInfo = await GetTableInfoAsync(conn, schema, table, cancellationToken);
 
             var settings = new JsonSerializerSettings
             {
@@ -174,7 +177,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = JsonConvert.SerializeObject(tableInfo, settings) } }
+                Content = [new Content { Type = "text", Text = JsonConvert.SerializeObject(tableInfo, settings) }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -182,14 +185,14 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new Content { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_filter_table_names"),
      Description("List tables whose names contain the given substring.")]
-    public static async Task<CallToolResponse> AdoFilterTableNames(
+    public async Task<CallToolResponse> AdoFilterTableNames(
         [Description("Substring to search")] string q,
         [Description("Schema name")] string? schema = null,
         [Description("ADO URL")] string? url = null,
@@ -206,7 +209,7 @@ public sealed class VirtuosoTools
             var restrictions = new string?[3];
             restrictions[0] = schema;
             restrictions[2] = "%";
-            var dt = conn.GetSchema("Tables", restrictions);
+            var dt = await conn.GetSchemaAsync("Tables", restrictions, cancellationToken);
 
             var list = new List<Dictionary<string, string?>>();
             foreach (DataRow row in dt.Rows)
@@ -222,6 +225,7 @@ public sealed class VirtuosoTools
                     });
                 }
             }
+
             var settings = new JsonSerializerSettings
             {
                 Formatting = Formatting.None,
@@ -230,7 +234,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = JsonConvert.SerializeObject(list, settings) } }
+                Content = [new Content { Type = "text", Text = JsonConvert.SerializeObject(list, settings) }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -238,14 +242,14 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new Content { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_execute_query"),
      Description("Execute a SQL query and return results in JSONL format.")]
-    public static async Task<CallToolResponse> AdoExecuteQuery(
+    public async Task<CallToolResponse> AdoExecuteQuery(
         [Description("SQL query")] string query,
         [Description("Max Rows")] int? max_rows = null,
         [Description("ADO URL")] string? url = null,
@@ -285,21 +289,21 @@ public sealed class VirtuosoTools
             var text = JsonConvert.SerializeObject(list, settings);
             return new CallToolResponse
             {
-                IsError = false, Content = new List<Content> { new Content { Type = "text", Text = text } }
+                IsError = false, Content = [new Content { Type = "text", Text = text }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return new CallToolResponse
             {
-                IsError = true, Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                IsError = true, Content = [new Content { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_execute_query_md"),
      Description("Execute a SQL query and return results in Markdown table format.")]
-    public static async Task<CallToolResponse> AdoExecuteQueryMd(
+    public async Task<CallToolResponse> AdoExecuteQueryMd(
         [Description("SQL query")] string query,
         [Description("Max Rows")] int? max_rows = null,
         [Description("ADO URL")] string? url = null,
@@ -340,7 +344,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = md.ToString() } }
+                Content = [new Content { Type = "text", Text = md.ToString() }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -348,7 +352,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new Content { Type = "text", Text = ex.Message }]
             };
         }
     }
@@ -356,7 +360,7 @@ public sealed class VirtuosoTools
 
     [McpServerTool(Name = "ado_query_database"),
      Description("Execute a SQL query and return results in JSONL format.")]
-    public static async Task<CallToolResponse> AdoQueryDatabase(
+    public async Task<CallToolResponse> AdoQueryDatabase(
         [Description("SQL query")] string query,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
@@ -396,7 +400,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = text } }
+                Content = [new Content { Type = "text", Text = text }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -404,14 +408,14 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new Content { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_spasql_query"),
      Description("Execute a SPASQL query and return results.")]
-    public static async Task<CallToolResponse> AdoSpasqlQuery(
+    public async Task<CallToolResponse> AdoSpasqlQuery(
         [Description("SPASQL query")] string query,
         [Description("Max Rows")] int? max_rows = null,
         [Description("Timeout ms")] int? timeout = null,
@@ -429,9 +433,10 @@ public sealed class VirtuosoTools
             await conn.OpenAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = $"select Demo.demo.execute_spasql_query('{EscapeSql(query)}', ?, ?) as result";
-            cmd.Parameters.Add(new OdbcParameter { Value = maxRows });
-            cmd.Parameters.Add(new OdbcParameter { Value = timeoutValue });
+            cmd.CommandText = $"select Demo.demo.execute_spasql_query(?, ?, ?) as result";
+            cmd.Parameters.Add(new VirtuosoParameter{ParameterName="@query", Value=query, DbType=DbType.AnsiString });
+            cmd.Parameters.Add(new VirtuosoParameter("@maxrows", maxRows ));
+            cmd.Parameters.Add(new VirtuosoParameter("@timeout", timeoutValue ));
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
@@ -439,7 +444,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = text } }
+                Content = [new Content { Type = "text", Text = text }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -447,14 +452,14 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new Content { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_sparql_query"),
      Description("Execute a SPARQL query and return results.")]
-    public static async Task<CallToolResponse> AdoSparqlQuery(
+    public async Task<CallToolResponse> AdoSparqlQuery(
         [Description("SPARQL query")] string query,
         [Description("Result format")] string? format = null,
         [Description("Timeout ms")] int? timeout = null,
@@ -473,16 +478,17 @@ public sealed class VirtuosoTools
             await conn.OpenAsync(cancellationToken);
             await using var cmd = conn.CreateCommand();
 
-            cmd.CommandText = $"select \"UB\".dba.\"sparqlQuery\"('{EscapeSql(query)}', ?, ?) as result";
-            cmd.Parameters.Add(new OdbcParameter { Value = formatValue });
-            cmd.Parameters.Add(new OdbcParameter { Value = timeoutValue });
+            cmd.CommandText = $"select \"UB\".dba.\"sparqlQuery\"(?, ?, ?) as result";
+            cmd.Parameters.Add(new VirtuosoParameter { ParameterName = "@query", Value = query, DbType = DbType.AnsiString });
+            cmd.Parameters.Add(new VirtuosoParameter("@fmt", formatValue));
+            cmd.Parameters.Add(new VirtuosoParameter("@timeout", timeoutValue));
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = text } }
+                Content = [new() { Type = "text", Text = text }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -490,14 +496,14 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new() { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_virtuoso_support_ai"),
      Description("Interact with Virtuoso Support AI Agent.")]
-    public static async Task<CallToolResponse> AdoVirtuosoSupportAi(
+    public async Task<CallToolResponse> AdoVirtuosoSupportAi(
         [Description("Prompt for AI agent")] string prompt,
         [Description("API Key")] string? api_key = null,
         [Description("ADO URL")] string? url = null,
@@ -512,15 +518,15 @@ public sealed class VirtuosoTools
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "select DEMO.DBA.OAI_VIRTUOSO_SUPPORT_AI(?, ?) as result";
-            cmd.Parameters.Add(new OdbcParameter { Value = prompt });
-            cmd.Parameters.Add(new OdbcParameter { Value = key });
+            cmd.Parameters.Add(new VirtuosoParameter("@prompt", prompt ));
+            cmd.Parameters.Add(new VirtuosoParameter("@key", key ));
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = text } }
+                Content = [new Content { Type = "text", Text = text }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -528,14 +534,14 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new() { Type = "text", Text = ex.Message }]
             };
         }
     }
 
     [McpServerTool(Name = "ado_sparql_func"),
      Description("Use the SPARQL AI Agent function.")]
-    public static async Task<CallToolResponse> AdoSparqlFunc(
+    public async Task<CallToolResponse> AdoSparqlFunc(
         [Description("Prompt for AI function")] string prompt,
         [Description("API Key")] string? api_key = null,
         [Description("ADO URL")] string? url = null,
@@ -550,15 +556,15 @@ public sealed class VirtuosoTools
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = "select DEMO.DBA.OAI_SPARQL_FUNC(?, ?) as result";
-            cmd.Parameters.Add(new OdbcParameter { Value = prompt });
-            cmd.Parameters.Add(new OdbcParameter { Value = key });
+            cmd.Parameters.Add(new VirtuosoParameter("@prompt", prompt));
+            cmd.Parameters.Add(new VirtuosoParameter("@key", key));
 
             await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
             var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
             return new CallToolResponse
             {
                 IsError = false,
-                Content = new List<Content> { new Content { Type = "text", Text = text } }
+                Content = [new Content { Type = "text", Text = text }]
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -566,7 +572,7 @@ public sealed class VirtuosoTools
             return new CallToolResponse
             {
                 IsError = true,
-                Content = new List<Content> { new Content { Type = "text", Text = ex.Message } }
+                Content = [new() { Type = "text", Text = ex.Message }]
             };
         }
     }
@@ -576,7 +582,7 @@ public sealed class VirtuosoTools
      Description(@"This query retrieves all entity types in the RDF graph, along with their labels and comments if available. "
                   +"It filters out blank nodes and ensures that only IRI types are returned. "
                   +"The LIMIT clause is set to 100 to restrict the number of entity types returned. ")]
-    public static async Task<CallToolResponse> AdoSparqlGetEntityTypes(
+    public async Task<CallToolResponse> AdoSparqlGetEntityTypes(
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
@@ -613,7 +619,7 @@ public sealed class VirtuosoTools
      Description(@"This query retrieves all entity types in the RDF graph, along with their labels and comments if available. "
                  + "It filters out blank nodes and ensures that only IRI types are returned. "
                  + "The LIMIT clause is set to 100 to restrict the number of entity types returned.")]
-    public static async Task<CallToolResponse> AdoSparqlGetEntityTypesDetailed(
+    public async Task<CallToolResponse> AdoSparqlGetEntityTypesDetailed(
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
@@ -644,7 +650,7 @@ public sealed class VirtuosoTools
      Description(@"This query retrieves samples of entities for each type in the RDF graph, along with their labels and counts. "
                 + "It groups by entity type and orders the results by sample count in descending order. "
                 + "Note: The LIMIT clause is set to 20 to restrict the number of entity types returned.")]
-    public static async Task<CallToolResponse> AdoSparqlGetEntityTypesSamples(
+    public async Task<CallToolResponse> AdoSparqlGetEntityTypesSamples(
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
@@ -657,9 +663,9 @@ public sealed class VirtuosoTools
         WHERE {
             GRAPH ?g {
                 ?s a ?o .
-                OPTIONAL {?s rdfs:label ?slabel . FILTER (LANG(?slabel) = \""en\"" || LANG(?slabel) = \""\"")}
+                OPTIONAL {?s rdfs:label ?slabel . FILTER (LANG(?slabel) = ""en"" || LANG(?slabel) = """")}
                 FILTER (isIRI(?s) && !isBlank(?s))
-                OPTIONAL {?o rdfs:label ?olabel . FILTER (LANG(?olabel) = \""en\"" || LANG(?olabel) = \""\"")}
+                OPTIONAL {?o rdfs:label ?olabel . FILTER (LANG(?olabel) = ""en"" || LANG(?olabel) = """")}
                 FILTER (isIRI(?o) && !isBlank(?o))
             }
         }
@@ -673,7 +679,7 @@ public sealed class VirtuosoTools
 
     [McpServerTool(Name = "ado_sparql_get_ontologies"),
      Description("This query retrieves all ontologies in the RDF graph, along with their labels and comments if available.")]
-    public static async Task<CallToolResponse> AdoSparqlGetOntologies(
+    public async Task<CallToolResponse> AdoSparqlGetOntologies(
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
@@ -706,14 +712,13 @@ public sealed class VirtuosoTools
     }
 
     //==========================
-    private static Dictionary<string, object?> GetTableInfoAsync(DbConnection conn, string? schema, string table)
+    private async Task<Dictionary<string, object?>> GetTableInfoAsync(DbConnection conn, string? schema, string table, CancellationToken cancellationToken = default)
     {
         var columns = new List<Dictionary<string, object?>>();
         var primaryKeys = new List<string>();
         var foreignKeys = new List<Dictionary<string, object?>>();
 
-
-        var tableSchema = conn.GetSchema("Tables", new[] { schema ?? null, null, table });
+        var tableSchema = await conn.GetSchemaAsync("Tables", [schema ?? null, null, table], cancellationToken);
         if (tableSchema.Rows.Count == 0)
         {
             return new Dictionary<string, object?>
@@ -732,7 +737,7 @@ public sealed class VirtuosoTools
         var cat = trow[0].ToString();
         var sch = trow[1].ToString();
 
-        var cols = conn.GetSchema("Columns", new[] { cat, sch, table });
+        var cols = await conn.GetSchemaAsync("Columns", [cat, sch, table, null], cancellationToken);
         foreach (DataRow row in cols.Rows)
         {
             columns.Add(new Dictionary<string, object?>
@@ -741,20 +746,18 @@ public sealed class VirtuosoTools
                 ["type"] = row[5].ToString(), //"DATA_TYPE"
                 ["column_size"] = row[6], //"CHARACTER_MAXIMUM_LENGTH"
                 ["num_prec_radix"] = row[9], //"NUMERIC_PRECISION_RADIX"
-                ["nullable"] = Convert.ToInt32(row[10]) == 1, // ToString()?.ToUpper() == "YES", //"IS_NULLABLE" ??
+                ["nullable"] = Convert.ToInt32(row[10]) != 1, 
                 ["default"] = row[12] //"COLUMN_DEFAULT"
             });
         }
-#if PKEY
-        var pk = conn.GetSchema("Indexes", new[] { cat, sch, table });
+
+        var pk = await conn.GetSchemaAsync("PRIMARYKEYS", [cat, sch, table], cancellationToken);
         foreach (DataRow row in pk.Rows)
         {
-            if (row["PRIMARY_KEY"].ToString()?.ToUpper() == "TRUE")
-                primaryKeys.Add(row[8].ToString()!); //"COLUMN_NAME"
+             primaryKeys.Add(row[3].ToString() ?? ""); //"COLUMN_NAME"
         }
-#endif
-#if FK_KEYS
-        var fk = conn.GetSchema("ForeignKeys", new[] { cat, sch, table });
+
+        var fk = await conn.GetSchemaAsync("ForeignKeys", [cat, sch, table], cancellationToken);
         foreach (DataRow row in fk.Rows)
         {
             foreignKeys.Add(new Dictionary<string, object?>
@@ -767,9 +770,9 @@ public sealed class VirtuosoTools
                 ["referred_columns"] = new List<string> { row[3].ToString()! } //"PKCOLUMN_NAME"
             });
         }
-#endif
-        //foreach (var column in columns)
-        //    column["primary_key"] = primaryKeys.Contains(column["name"]?.ToString()!);
+
+        foreach (var column in columns)
+            column["primary_key"] = primaryKeys.Contains(column["name"]?.ToString()!);
 
         return new Dictionary<string, object?>
         {
@@ -777,8 +780,8 @@ public sealed class VirtuosoTools
             ["TABLE_SCHEM"] = schema,
             ["TABLE_NAME"] = table,
             ["columns"] = columns,
-            //["primary_keys"] = primaryKeys,
-            //["foreign_keys"] = foreignKeys
+            ["primary_keys"] = primaryKeys,
+            ["foreign_keys"] = foreignKeys
         };
     }
 

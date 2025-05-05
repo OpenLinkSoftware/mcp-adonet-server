@@ -5,6 +5,8 @@ using McpNetServer.Tools;
 
 
 var builder = Host.CreateApplicationBuilder(args);
+builder.Logging.ClearProviders();
+
 builder.Logging.AddConsole(options =>
 {
     options.LogToStandardErrorThreshold = LogLevel.Trace;
