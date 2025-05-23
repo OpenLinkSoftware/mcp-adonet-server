@@ -457,50 +457,6 @@ public sealed class VirtuosoTools
         }
     }
 
-    [McpServerTool(Name = "ado_sparql_query"),
-     Description("Execute a SPARQL query and return results.")]
-    public async Task<CallToolResponse> AdoSparqlQuery(
-        [Description("SPARQL query")] string query,
-        [Description("Result format")] string? format = null,
-        [Description("Timeout ms")] int? timeout = null,
-        [Description("ADO URL")] string? url = null,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(query))
-                throw new ArgumentException("Query string cannot be null or empty.", nameof(query));
-
-            var formatValue = string.IsNullOrWhiteSpace(format) ? "json" : format;
-            var timeoutValue = timeout ?? 300000;
-
-            await using var conn = GetConnection(url);
-            await conn.OpenAsync(cancellationToken);
-            await using var cmd = conn.CreateCommand();
-
-            cmd.CommandText = $"select \"UB\".dba.\"sparqlQuery\"(?, ?, ?) as result";
-            cmd.Parameters.Add(new VirtuosoParameter { ParameterName = "@query", Value = query, DbType = DbType.AnsiString });
-            cmd.Parameters.Add(new VirtuosoParameter("@fmt", formatValue));
-            cmd.Parameters.Add(new VirtuosoParameter("@timeout", timeoutValue));
-
-            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
-            var text = (await reader.ReadAsync(cancellationToken)) ? reader.GetString(0) : string.Empty;
-            return new CallToolResponse
-            {
-                IsError = false,
-                Content = [new() { Type = "text", Text = text }]
-            };
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            return new CallToolResponse
-            {
-                IsError = true,
-                Content = [new() { Type = "text", Text = ex.Message }]
-            };
-        }
-    }
-
     [McpServerTool(Name = "ado_virtuoso_support_ai"),
      Description("Interact with Virtuoso Support AI Agent.")]
     public async Task<CallToolResponse> AdoVirtuosoSupportAi(
