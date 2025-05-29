@@ -23,10 +23,15 @@ A lightweight MCP (Model Context Protocol) server for ADO.NET . This server is c
 ---
 
 ## Prerequisites
-1. **NET.8 or above**
+1. **NET.8**
 - Check that the project file (`MCP_AdoNet_Server.csproj`) is compatible with your environment by running:
   ```sh
-  dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+  dotnet run --framework net8.0 --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
+  ```
+2. **NET.9**
+- Check that the project file (`MCP_AdoNet_Server.csproj`) is compatible with your environment by running:
+  ```sh
+  dotnet run --framework net9.0 --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
   ```
 - If need be, you can also attempt to rebuild `MCP_AdoNet_Server.csproj` by running:
   ```sh
@@ -55,12 +60,29 @@ API_KEY=xxx
 
 For **Claude Desktop** users:
 Add the following to `claude_desktop_config.json`:
+1. **NET.8**
 ```json
 {
   "mcpServers": {
     "my_database": {
       "command": "dotnet",
-      "args": ["run", "--project", "/path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj"],
+      "args": ["run", "--framework", "net8.0", "--project", "/path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj"],
+      "env": {
+        "ADO_URL": "HOST=localhost:1111;Database=Demo;UID=demo;PWD=demo",
+        "API_KEY": "sk-xxx"
+      }
+    }
+  }
+}
+```
+
+2. **NET.9**
+```json
+{
+  "mcpServers": {
+    "my_database": {
+      "command": "dotnet",
+      "args": ["run", "--framework", "net9.0", "--project", "/path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj"],
       "env": {
         "ADO_URL": "HOST=localhost:1111;Database=Demo;UID=demo;PWD=demo",
         "API_KEY": "sk-xxx"
