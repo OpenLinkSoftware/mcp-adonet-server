@@ -203,7 +203,13 @@ For easy troubleshooting:
    ```bash
    dotnet clean /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj
    
-   npx @modelcontextprotocol/inspector dotnet run --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="HOST=localhost:1111;Database=Demo;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
+   npx @modelcontextprotocol/inspector dotnet run --framework net8.0 --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="HOST=localhost:1111;Database=Demo;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
+
+   or
+
+   npx @modelcontextprotocol/inspector dotnet run --framework net9.0 --project /path/to/mcp-adonet-server/MCP_AdoNet_Server.csproj -e ADO_URL="HOST=localhost:1111;Database=Demo;UID=username;PWD=password" -e API_KEY="sk-xxx-myapikey-xxx"
+
+   depending on which .Net version is in use.
 
    ```
 
