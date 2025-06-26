@@ -534,137 +534,197 @@ public sealed class VirtuosoTools
     }
 
 
-    [McpServerTool(Name = "ado_sparql_get_entity_types"),
+    private async Task<CallToolResponse> ExecuteQuery(
+        string query, string? graph, int? max_rows = null, string? url = null,
+        CancellationToken cancellationToken = default)
+    {
+        try {
+            var maxRows = max_rows ?? 100;
+            await using var conn = GetConnection(url);
+            await conn.OpenAsync(cancellationToken);
+
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = query;
+            if (graph != null)
+                cmd.Parameters.Add(new VirtuosoParameter("@graph", graph));
+            await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
+
+            var list = new List<Dictionary<string, object?>>();
+            var settings = new JsonSerializerSettings
+            {
+                Formatting = Formatting.None,
+                NullValueHandling = NullValueHandling.Include
+            };
+
+            int count = 0;
+            while (await reader.ReadAsync(cancellationToken) && count < maxRows)
+            {
+                var row = new Dictionary<string, object?>();
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    var val = reader.GetValue(i);
+                    var str = val?.ToString() ?? null;
+                    if (str != null && str.Length > DefaultMaxLongData)
+                        str = str.Substring(0, DefaultMaxLongData);
+                    row[reader.GetName(i)] = str;
+                }
+                list.Add(row);
+                count++;
+            }
+            var text = JsonConvert.SerializeObject(list, settings);
+            return new CallToolResponse
+            {
+                IsError = false, Content = [new Content { Type = "text", Text = text }]
+            };
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            return new CallToolResponse
+            {
+                IsError = true, Content = [new Content { Type = "text", Text = ex.Message }]
+            };
+        }
+    }
+
+    [McpServerTool(Name = "ado_sparql_list_entity_types"),
      Description(@"This query retrieves all entity types in the RDF graph, along with their labels and comments if available. "
-                  +"It filters out blank nodes and ensures that only IRI types are returned. "
-                  +"The LIMIT clause is set to 100 to restrict the number of entity types returned. ")]
-    public async Task<CallToolResponse> AdoSparqlGetEntityTypes(
+                  + "It filters out blank nodes and ensures that only IRI types are returned. "
+                  + "The LIMIT clause is set to 100 to restrict the number of entity types returned. ")]
+    public async Task<CallToolResponse> AdoSparqlListEntityTypes(
+        [Description("Graph Name")] string? graph = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var query = @"SELECT DISTINCT * FROM (
+        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var query = $@"SELECT DISTINCT * FROM (
   SPARQL 
   PREFIX owl: <http://www.w3.org/2002/07/owl#>
   PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
   PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
   SELECT ?o 
-  WHERE {
-    GRAPH ?g {
+  WHERE {{
+     {graph_clause} {{
         ?s a ?o .
         
-        OPTIONAL {
+        OPTIONAL {{
             ?s rdfs:label ?label . 
             FILTER (LANG(?label) = ""en"" || LANG(?label) = """")
-        }
+        }}
         
-        OPTIONAL {
+        OPTIONAL {{
             ?s rdfs:comment ?comment . 
             FILTER (LANG(?comment) = ""en"" || LANG(?comment) = """")
-        }
+        }}
         
         FILTER (isIRI(?o) && !isBlank(?o))
-    }
-  }
+    }}
+  }}
   LIMIT 100
 ) AS x";
-        return await AdoQueryDatabase(query, url, cancellationToken);
+        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
     }
 
 
-    [McpServerTool(Name = "ado_sparql_get_entity_types_detailed"),
+    [McpServerTool(Name = "ado_sparql_list_entity_types_detailed"),
      Description(@"This query retrieves all entity types in the RDF graph, along with their labels and comments if available. "
                  + "It filters out blank nodes and ensures that only IRI types are returned. "
                  + "The LIMIT clause is set to 100 to restrict the number of entity types returned.")]
-    public async Task<CallToolResponse> AdoSparqlGetEntityTypesDetailed(
+    public async Task<CallToolResponse> AdoSparqlListEntityTypesDetailed(
+        [Description("Graph Name")] string? graph = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var query = @"SELECT * FROM (
+        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var query = $@"SELECT * FROM (
         SPARQL
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
 
         SELECT ?o, (SAMPLE(?label) AS ?label), (SAMPLE(?comment) AS ?comment)
-        WHERE {
-            GRAPH ?g {
+        WHERE {{
+            {graph_clause} {{
                 ?s a ?o .
-                OPTIONAL {?o rdfs:label ?label . FILTER (LANG(?label) = ""en"" || LANG(?label) = """")}
-                OPTIONAL {?o rdfs:comment ?comment . FILTER (LANG(?comment) = ""en"" || LANG(?comment) = """")}
+                OPTIONAL {{?o rdfs:label ?label . FILTER (LANG(?label) = ""en"" || LANG(?label) = """")}}
+                OPTIONAL {{?o rdfs:comment ?comment . FILTER (LANG(?comment) = ""en"" || LANG(?comment) = """")}}
                 FILTER (isIRI(?o) && !isBlank(?o))
-            }
-        }
+            }}
+        }}
         GROUP BY ?o
         ORDER BY ?o
         LIMIT 20
     ) AS results ";
-        return await AdoQueryDatabase(query, url, cancellationToken);
+        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
     }
 
 
-    [McpServerTool(Name = "ado_sparql_get_entity_types_samples"),
+    [McpServerTool(Name = "ado_sparql_list_entity_types_samples"),
      Description(@"This query retrieves samples of entities for each type in the RDF graph, along with their labels and counts. "
                 + "It groups by entity type and orders the results by sample count in descending order. "
                 + "Note: The LIMIT clause is set to 20 to restrict the number of entity types returned.")]
-    public async Task<CallToolResponse> AdoSparqlGetEntityTypesSamples(
+    public async Task<CallToolResponse> AdoSparqlListEntityTypesSamples(
+        [Description("Graph Name")] string? graph = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var query = @"SELECT * FROM (
+        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var query = $@"SELECT * FROM (
         SPARQL
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
         SELECT (SAMPLE(?s) AS ?sample), ?slabel, (COUNT(*) AS ?sampleCount), (?o AS ?entityType), ?olabel
-        WHERE {
-            GRAPH ?g {
+        WHERE {{
+            {graph_clause} {{
                 ?s a ?o .
-                OPTIONAL {?s rdfs:label ?slabel . FILTER (LANG(?slabel) = ""en"" || LANG(?slabel) = """")}
+                OPTIONAL {{?s rdfs:label ?slabel . FILTER (LANG(?slabel) = ""en"" || LANG(?slabel) = """")}}
                 FILTER (isIRI(?s) && !isBlank(?s))
-                OPTIONAL {?o rdfs:label ?olabel . FILTER (LANG(?olabel) = ""en"" || LANG(?olabel) = """")}
+                OPTIONAL {{?o rdfs:label ?olabel . FILTER (LANG(?olabel) = ""en"" || LANG(?olabel) = """")}}
                 FILTER (isIRI(?o) && !isBlank(?o))
-            }
-        }
+            }}
+        }}
         GROUP BY ?slabel ?o ?olabel
         ORDER BY DESC(?sampleCount) ?o ?slabel ?olabel
         LIMIT 20
     ) AS results";
-        return await AdoQueryDatabase(query, url, cancellationToken);
+        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
     }
 
 
-    [McpServerTool(Name = "ado_sparql_get_ontologies"),
+    [McpServerTool(Name = "ado_sparql_list_ontologies"),
      Description("This query retrieves all ontologies in the RDF graph, along with their labels and comments if available.")]
-    public async Task<CallToolResponse> AdoSparqlGetOntologies(
+    public async Task<CallToolResponse> AdoSparqlListOntologies(
+        [Description("Graph Name")] string? graph = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var query = @"SELECT * FROM (
+        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var query = $@"SELECT * FROM (
         SPARQL 
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
         PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
         PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
         SELECT ?s, ?label, ?comment 
-        WHERE {
-            GRAPH ?g {
+        WHERE {{
+            {graph_clause} {{
                 ?s a owl:Ontology .
             
-                OPTIONAL {
+                OPTIONAL {{
                     ?s rdfs:label ?label . 
                     FILTER (LANG(?label) = ""en"" || LANG(?label) = """")
-                }
+                }}
             
-                OPTIONAL {
+                OPTIONAL {{
                     ?s rdfs:comment ?comment . 
                     FILTER (LANG(?comment) = ""en"" || LANG(?comment) = """")
-                }
+                }}
             
                 FILTER (isIRI(?o) && !isBlank(?o))
-            }
-        }
+            }}
+        }}
         LIMIT 100
     ) AS x";
-        return await AdoQueryDatabase(query, url, cancellationToken);
+        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
     }
 
     //==========================
