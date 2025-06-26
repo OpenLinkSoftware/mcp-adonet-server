@@ -719,7 +719,7 @@ public sealed class VirtuosoTools
                     FILTER (LANG(?comment) = ""en"" || LANG(?comment) = """")
                 }}
             
-                FILTER (isIRI(?o) && !isBlank(?o))
+                FILTER (isIRI(?s) && !isBlank(?s))
             }}
         }}
         LIMIT 100
