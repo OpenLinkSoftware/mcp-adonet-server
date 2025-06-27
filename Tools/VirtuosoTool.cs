@@ -591,11 +591,11 @@ public sealed class VirtuosoTools
                   + "It filters out blank nodes and ensures that only IRI types are returned. "
                   + "The LIMIT clause is set to 100 to restrict the number of entity types returned. ")]
     public async Task<CallToolResponse> AdoSparqlListEntityTypes(
-        [Description("Graph Name")] string? graph = null,
+        [Description("Graph IRI")] string? graph_iri = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var graph_clause = graph_iri != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
         var query = $@"SELECT DISTINCT * FROM (
   SPARQL 
   PREFIX owl: <http://www.w3.org/2002/07/owl#>
@@ -621,7 +621,7 @@ public sealed class VirtuosoTools
   }}
   LIMIT 100
 ) AS x";
-        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
+        return await ExecuteQuery(query, graph_iri, 100, url, cancellationToken);
     }
 
 
@@ -630,11 +630,11 @@ public sealed class VirtuosoTools
                  + "It filters out blank nodes and ensures that only IRI types are returned. "
                  + "The LIMIT clause is set to 100 to restrict the number of entity types returned.")]
     public async Task<CallToolResponse> AdoSparqlListEntityTypesDetailed(
-        [Description("Graph Name")] string? graph = null,
+        [Description("Graph IRI")] string? graph_iri = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var graph_clause = graph_iri != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
         var query = $@"SELECT * FROM (
         SPARQL
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
@@ -654,7 +654,7 @@ public sealed class VirtuosoTools
         ORDER BY ?o
         LIMIT 20
     ) AS results ";
-        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
+        return await ExecuteQuery(query, graph_iri, 100, url, cancellationToken);
     }
 
 
@@ -663,11 +663,11 @@ public sealed class VirtuosoTools
                 + "It groups by entity type and orders the results by sample count in descending order. "
                 + "Note: The LIMIT clause is set to 20 to restrict the number of entity types returned.")]
     public async Task<CallToolResponse> AdoSparqlListEntityTypesSamples(
-        [Description("Graph Name")] string? graph = null,
+        [Description("Graph IRI")] string? graph_iri = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var graph_clause = graph_iri != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
         var query = $@"SELECT * FROM (
         SPARQL
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
@@ -687,18 +687,18 @@ public sealed class VirtuosoTools
         ORDER BY DESC(?sampleCount) ?o ?slabel ?olabel
         LIMIT 20
     ) AS results";
-        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
+        return await ExecuteQuery(query, graph_iri, 100, url, cancellationToken);
     }
 
 
     [McpServerTool(Name = "ado_sparql_list_ontologies"),
      Description("This query retrieves all ontologies in the RDF graph, along with their labels and comments if available.")]
     public async Task<CallToolResponse> AdoSparqlListOntologies(
-        [Description("Graph Name")] string? graph = null,
+        [Description("Graph IRI")] string? graph_iri = null,
         [Description("ADO URL")] string? url = null,
         CancellationToken cancellationToken = default)
     {
-        var graph_clause = graph != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
+        var graph_clause = graph_iri != null ? "GRAPH `iri(??)`" : "GRAPH ?g";
         var query = $@"SELECT * FROM (
         SPARQL 
         PREFIX owl: <http://www.w3.org/2002/07/owl#>
@@ -724,7 +724,7 @@ public sealed class VirtuosoTools
         }}
         LIMIT 100
     ) AS x";
-        return await ExecuteQuery(query, graph, 100, url, cancellationToken);
+        return await ExecuteQuery(query, graph_iri, 100, url, cancellationToken);
     }
 
     //==========================
