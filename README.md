@@ -1,7 +1,7 @@
 ---
 # OpenLink MCP Server for ADO\.NET
 
-A lightweight C#=based MCP (Model Context Protocol) server for ADO\.NET . This server is compatible with Virtuoso. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux. 
+A lightweight C#-based MCP (Model Context Protocol) server for ADO\.NET . This server is compatible with Virtuoso. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux. 
 
 ![mcp-client-and-servers|648x499](https://www.openlinksw.com/DAV/www2.openlinksw.com/data/gifs//mcp-client-and-servers-opal-tools-with-dotnet.gif)
 ---
