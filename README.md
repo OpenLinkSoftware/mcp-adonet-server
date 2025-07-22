@@ -1,7 +1,7 @@
 ---
-# C# based Model Context Procotol (MCP) Server for ADO\.NET
+# OpenLink MCP Server for ADO\.NET
 
-A lightweight MCP (Model Context Protocol) server for ADO\.NET. This server is compatible with Virtuoso. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux.
+A lightweight C#=based MCP (Model Context Protocol) server for ADO\.NET . This server is compatible with Virtuoso. Currently, this server has only been successfully tested using the .NET runtimes on Windows and Linux. 
 
 ![mcp-client-and-servers|648x499](https://www.openlinksw.com/DAV/www2.openlinksw.com/data/gifs//mcp-client-and-servers-opal-tools-with-dotnet.gif)
 ---
@@ -120,14 +120,14 @@ After successful installation, the following tools will be available to MCP clie
 - **`ado_get_schemas`**
   - Retrieve and return a list of all schema names from the connected database.
   - Input parameters:
-    - `url` (string, optional): ADO.NET URL connection string.
+    - `url` (string, optional): ADO\.NET URL connection string.
   - Returns a JSON string array of schema names.
 
 - **`ado_get_tables`**
   - Retrieve and return a list containing information about tables in a specified schema. If no schema is provided, uses the connection's default schema.
   - Input parameters:
     - `schema` (string, optional): Database schema to filter tables. Defaults to connection default.
-    - `url` (string, optional): ADO.NET URL connection string.
+    - `url` (string, optional): ADO\.NET URL connection string.
   - Returns a JSON string containing table information (e.g., `TABLE_CAT`, `TABLE_SCHEM`, `TABLE_NAME`, `TABLE_TYPE`).
 
 - **`ado_filter_table_names`**
@@ -135,7 +135,7 @@ After successful installation, the following tools will be available to MCP clie
   - Input parameters:
     - `q` (string, required): The substring to search for within table names.
     - `schema` (string, optional): Database schema to filter tables. Defaults to connection default.
-    - `url` (string, optional): ADO.NET URL connection string.
+    - `url` (string, optional): ADO\.NET URL connection string.
   - Returns a JSON string containing information for matching tables.
 
 - **`ado_describe_table`**
@@ -173,7 +173,7 @@ After successful installation, the following tools will be available to MCP clie
     - `query` (string, required): The SPASQL query string.
     - `max_rows` (number, optional): Maximum number of rows to return. Defaults to `20`.
     - `timeout` (number, optional): Query timeout in milliseconds. Defaults to `30000`.
-    - `url` (string, optional): ADO.NET URL connection string.
+    - `url` (string, optional): ADO\.NET URL connection string.
   - Returns the result from the underlying stored procedure call (e.g., ``Demo.demo.execute_spasql_query``).
 
 - **`ado_sparql_query`**
